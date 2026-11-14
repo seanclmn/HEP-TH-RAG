@@ -1,0 +1,38 @@
+# Secrets / local config
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.python-version
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.ipynb_checkpoints/
+
+# Data, models and DB dumps
+data/
+*.dump
+*.sql.gz
+*.parquet
+*.pt
+*.safetensors
+
+# Logs
+*.log
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
+*.swp
