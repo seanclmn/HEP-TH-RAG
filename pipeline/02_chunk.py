@@ -1,6 +1,8 @@
 """Clean the LaTeX source of downloaded papers and split it into retrieval chunks.
 
 Per paper:
+  0. Expand the paper's own macros with its own definitions (macros.py), so chunks read
+     \\mathcal{O} rather than \\cO, and \\be means whatever this paper defined it as.
   1. Keep only the document body (\\begin{document} .. \\end{document}); drop % comments,
      comment/\\iffalse blocks, bibliography, labels, citations, graphics and layout
      commands. Figures/tables are reduced to their captions. Math is kept as LaTeX.
@@ -26,6 +28,8 @@ from pathlib import Path
 
 import duckdb
 from transformers import AutoTokenizer
+
+from macros import expand, extract_macros
 
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_IN = ROOT / "data" / "raw" / "hepth_latest_100.parquet"
@@ -214,8 +218,11 @@ def pack(text: str) -> list[str]:
 
 
 def chunk_paper(paper_id: str, abstract: str, tex: str, resolved: bool) -> list[dict]:
-    rows = [{"section_path": "Abstract", "content": re.sub(r"\s+", " ", abstract or "").strip()}]
-    for path, text in sections(clean(tex, resolved)):
+    macros, body = extract_macros(tex)
+    # The metadata abstract can use the paper's macros too, so expand it with the same table.
+    abstract = expand(re.sub(r"\s+", " ", abstract or "").strip(), macros)
+    rows = [{"section_path": "Abstract", "content": abstract}]
+    for path, text in sections(clean(expand(body, macros), resolved)):
         rows += [{"section_path": path, "content": c} for c in pack(text)]
     out = []
     for r in rows:

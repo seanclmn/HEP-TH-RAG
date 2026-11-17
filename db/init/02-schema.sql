@@ -34,3 +34,20 @@ CREATE TABLE IF NOT EXISTS chunks (
 
 CREATE INDEX IF NOT EXISTS chunks_embedding_hnsw
     ON chunks USING hnsw (embedding vector_cosine_ops);
+
+-- Lexical (BM25) half of hybrid search; see pipeline/lexical.py.
+-- lex holds our own LaTeX-aware terms (not to_tsvector output); NULL = not yet indexed.
+ALTER TABLE chunks ADD COLUMN IF NOT EXISTS lex     tsvector;
+ALTER TABLE chunks ADD COLUMN IF NOT EXISTS lex_len int;      -- number of terms, for BM25
+
+CREATE INDEX IF NOT EXISTS chunks_lex_gin ON chunks USING gin (lex);
+
+CREATE TABLE IF NOT EXISTS lex_terms (      -- document frequency per term
+    term text PRIMARY KEY,
+    df   int  NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS lex_corpus (     -- single row: corpus stats for BM25
+    n_docs  int    NOT NULL,
+    avg_len float8 NOT NULL
+);
