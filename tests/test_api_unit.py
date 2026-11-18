@@ -82,7 +82,39 @@ class TestPrompt:
     def test_sources_numbered_like_excerpts(self):
         src = rag.sources([hit("a"), hit("b", "x " * 500)])
         assert [s["n"] for s in src] == [1, 2] and src[1]["paper_id"] == "b"
-        assert len(src[1]["snippet"]) <= 200 and "content" not in src[0]
+        assert len(src[1]["snippet"]) <= 281 and "content" not in src[0]
+
+
+class TestMathSnippet:
+    def test_equation_environments_become_math(self):
+        out = rag.math_snippet(r"so \begin{equation} E = mc^2 \label{eq:e} \end{equation} holds")
+        assert out == "so $E = mc^2$ holds"
+        out = rag.math_snippet(r"\begin{align*} a &= b \\ c &= d \end{align*}")
+        assert out == r"$\begin{aligned}a &= b \\ c &= d\end{aligned}$"
+        assert rag.math_snippet(r"\[ x \] and \( y \)") == "$x$ and $y$"
+
+    def test_never_cuts_inside_a_formula(self):
+        text = "word " * 50 + r"$\sum_{i=1}^{N} J_{ijkl}\chi_i\chi_j$ more words " * 5
+        for width in range(240, 320, 7):
+            out = rag.math_snippet(text, width)
+            assert out.endswith("…")
+            assert out.count("$") % 2 == 0, (width, out[-60:])
+            assert len(out) <= width * 1.5 + 1
+
+    def test_formula_cut_by_the_chunker_is_dropped(self):
+        assert rag.math_snippet(r"mu_0$ in a scheme. Then $x$ holds") == "in a scheme. Then $x$ holds"
+        assert rag.math_snippet(r"Then $x$ holds and $\sum_i a_i") == "Then $x$ holds and"
+        assert rag.math_snippet(r"a = b \end{equation} so $x$") == "so $x$"
+        assert rag.math_snippet(r"so $x$ and \begin{align} G = 1") == "so $x$ and"
+
+    def test_unrepairable_falls_back_to_escaped_text(self):
+        assert rag.math_snippet(r"a_1 + b$") == r"a_1 + b\$"   # nothing left after the repair
+        long_formula = "$" + r"\alpha + " * 100 + "x$"
+        out = rag.math_snippet(long_formula, 100)
+        assert out.startswith(r"\$\alpha") and out.endswith("…")
+
+    def test_short_text_unchanged(self):
+        assert rag.math_snippet("  a\n b  ") == "a b"
 
 
 def test_short_authors():
