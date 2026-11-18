@@ -107,6 +107,7 @@ class Hit:
     score: float                     # fused RRF score; the ranking key
     similarity: float | None = None  # cosine similarity to the query (vector/hybrid)
     bm25: float | None = None        # lexical score, if the chunk was a lexical candidate
+    authors: str | None = None
 
 
 @dataclass(frozen=True)
@@ -124,7 +125,7 @@ LIMIT %(n)s
 
 FETCH_SQL = """
 SELECT c.id, c.paper_id, c.chunk_index, p.title, c.section_path, c.content, p.arxiv_abs_url,
-       {similarity}
+       p.authors, {similarity}
 FROM chunks c JOIN papers p USING (paper_id)
 WHERE c.id = ANY(%(ids)s)
 """
@@ -212,9 +213,9 @@ def search(conn, embedding: np.ndarray | None = None, k: int = 10, per_paper: in
     by_id = {r[0]: r for r in rows}
     hits = []
     for c in picked:
-        _, pid, idx, title, path, content, url, sim = by_id[c.id]
+        _, pid, idx, title, path, content, url, authors, sim = by_id[c.id]
         hits.append(Hit(pid, idx, " ".join(title.split()), path, content, url, c.score,
-                        None if sim is None else float(sim), bm25.get(c.id)))
+                        None if sim is None else float(sim), bm25.get(c.id), authors))
     return hits
 
 

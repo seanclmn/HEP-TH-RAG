@@ -1,8 +1,8 @@
 # HEP-TH RAG
 
 Question answering over arXiv **hep-th** papers, searching their full LaTeX source.
-Postgres + pgvector for storage, Qwen3-Embedding for vectors. Generation (LLM answers),
-the API (`api/`) and the web UI (`web/`) are not built yet.
+Postgres + pgvector for storage, Qwen3-Embedding for vectors, a local Ollama model for
+answers, served by a FastAPI app (`api/`) with a Next.js chat UI (`web/`).
 
 ## Usage
 
@@ -15,6 +15,11 @@ cp .env.example .env && docker compose up -d   # Postgres + pgvector
 
 .venv/bin/python pipeline/04_search.py "your question"     # --mode hybrid|vector|lexical
 .venv/bin/python -m pytest                                 # add -m slow for model tests
+
+brew install ollama && ollama serve                        # in its own terminal
+ollama pull qwen3:8b                                    # model set by OLLAMA_MODEL
+.venv/bin/uvicorn api.main:app --reload                    # API docs: localhost:8000/docs
+cd web && yarn install && yarn dev                         # chat UI: localhost:3000
 ```
 
 Every step is safe to re-run. `03_embed.py` only re-embeds chunks whose text changed.
@@ -57,6 +62,15 @@ extraction mangles it. Keeping the source makes formulas searchable.
 - `content_sha` lets re-runs re-embed only the chunks that changed.
 - The schema must stay idempotent, because `03_embed.py` re-applies it on every run.
 - After changing `lexical.py`, run `03b_index_lexical.py --rebuild`.
+
+**API (`api/`).**
+- `chats` and `messages` live in the same database (`db/init/03-chat.sql`, applied on
+  startup). Deleting a chat deletes its messages.
+- `POST /chats/{id}/messages` retrieves `k` chunks (hybrid search), sends them with the
+  last 20 messages to Ollama, and streams the answer as Server-Sent Events:
+  `sources`, then `delta`s, then `done` (an `error` event is sent before `done` on failure).
+- The answer is saved when the stream ends, even if it was cut off, so history stays
+  consistent with what the user saw.
 
 ## Known issues
 
